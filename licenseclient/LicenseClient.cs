@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json;
+using System;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
@@ -11,49 +12,59 @@ namespace licenseclient
     {
         private const string username = "licenseservice";
         private const string password = "v(Y3=j}]:]40";
-        private const string ApiBaseUrl = "http://localhost:3300/client"; 
+        private const string ApiBaseUrl = "http://localhost:3300/client";
 
-        private async Task<string> GetToken(string productCode, string clientCode)
+        private async Task<string> GetToken(string productCode, string clientCode, string username, string password)
         {
             using (var client = new HttpClient())
             {
-                var url = $"{ApiBaseUrl}/getToken";
-
-                // Constructing the authentication data with productCode, clientCode, username, and password
-                var authData = new
+                try
                 {
-                    productCode,
-                    clientCode,
-                    username, 
-                    password 
-                };
+                    var url = $"{ApiBaseUrl}/getToken";
 
-                // Serializing the data to JSON and sending the POST request
-                var jsonContent = JsonConvert.SerializeObject(authData);
-                var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+                    // Constructing the authentication data
+                    var authData = new
+                    {
+                        productCode,
+                        clientCode,
+                        username,
+                        password
+                    };
 
-                var response = await client.PostAsync(url, content);
+                    // Serializing the data to JSON and sending the POST request
+                    var jsonContent = JsonConvert.SerializeObject(authData);
+                    var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
-                // Ensure the response is successful
-                if (response.IsSuccessStatusCode)
-                {
-                    var result = await response.Content.ReadAsStringAsync();
-                    var tokenResponse = JsonConvert.DeserializeObject<TokenResponse>(result);
+                    var response = await client.PostAsync(url, content);
 
-                    return tokenResponse?.Token;                    
+                    // Ensure the response is successful
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var result = await response.Content.ReadAsStringAsync();
+                        var tokenResponse = JsonConvert.DeserializeObject<TokenResponse>(result);
+
+                        return tokenResponse?.Data?.Token; // Returning the token from the nested Data object
+                    }
+                    else
+                    {
+                        // If the response is not successful, throw an error with the response content
+                        var error = await response.Content.ReadAsStringAsync();
+                        throw new HttpRequestException($"Error: {response.StatusCode}, Details: {error}");
+                    }
                 }
-                else
+                catch (Exception ex)
                 {
-                    var error = await response.Content.ReadAsStringAsync();
-                    throw new HttpRequestException(error);
+                    // Optionally log the exception
+                    throw new Exception("An error occurred while fetching the token.", ex);
                 }
             }
         }
 
 
+
         public async Task<string> ActivateLicense(string productCode, string clientCode, string licenseKey, string macID)
         {
-            var token = await GetToken(productCode, clientCode); 
+            var token = await GetToken(productCode, clientCode, username, password); 
 
             
             using (var client = new HttpClient())
@@ -85,7 +96,7 @@ namespace licenseclient
 
         public async Task<string> ValidateLicense(string productCode, string clientCode, string macID)
         {
-            var token = await GetToken(productCode, clientCode); 
+            var token = await GetToken(productCode, clientCode, username, password); 
 
 
             using (var client = new HttpClient())
@@ -116,7 +127,7 @@ namespace licenseclient
 
         public async Task<string> TransferLicense(string productCode, string clientCode, string licenseKey, string macID)
         {
-            var token = await GetToken(productCode, clientCode); 
+            var token = await GetToken(productCode, clientCode, username, password); 
 
 
             using (var client = new HttpClient())
